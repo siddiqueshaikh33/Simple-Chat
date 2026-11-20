@@ -8,6 +8,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -174,6 +176,19 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().status()).isEqualTo("error");
         assertThat(response.getBody().message()).isEqualTo("Missing required request parameter: roomId");
+    }
+
+    @Test
+    @DisplayName("handleRedisUnavailable maps to 503 Service Unavailable")
+    void handleRedisUnavailable_returns503ServiceUnavailable() {
+        RedisConnectionFailureException ex =
+                new RedisConnectionFailureException("Unable to connect to Redis on localhost:6379");
+        ResponseEntity<ErrorResponse> response = exceptionHandler.handleRedisUnavailable(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().status()).isEqualTo("error");
+        assertThat(response.getBody().message()).contains("Database service is temporarily unavailable");
     }
 
     @Test

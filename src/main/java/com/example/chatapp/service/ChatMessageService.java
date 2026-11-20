@@ -72,11 +72,16 @@ public class ChatMessageService {
 
         ChatMessage chatMessage = new ChatMessage(participant, messageText, timestamp);
 
-        // 4. Append to Redis List (storage/history)
+        // 4. Append to Redis List (authoritative persistent storage)
         messageRepository.saveMessage(normalizedRoomId, chatMessage);
 
-        // 5. Broadcast to Redis Pub/Sub (real-time notification)
-        messagePublisher.publish(normalizedRoomId, chatMessage);
+        // 5. Broadcast to Redis Pub/Sub (best-effort real-time delivery)
+        try {
+            messagePublisher.publish(normalizedRoomId, chatMessage);
+        } catch (Exception e) {
+            log.error("Failed to broadcast real-time message for room '{}', but message was safely persisted to history",
+                    normalizedRoomId, e);
+        }
 
         log.info("Message sent by '{}' to room '{}' at '{}'", participant, normalizedRoomId, timestamp);
         return SendMessageResponse.ok();

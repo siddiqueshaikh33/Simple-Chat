@@ -4,6 +4,8 @@ import com.example.chatapp.dto.ErrorResponse;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -136,6 +138,16 @@ public class GlobalExceptionHandler {
         log.warn("Missing request parameter: {}", ex.getParameterName());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ErrorResponse.of("Missing required request parameter: " + ex.getParameterName()));
+    }
+
+    /**
+     * Handles Redis connection or infrastructure outages, returning HTTP 503 Service Unavailable.
+     */
+    @ExceptionHandler({RedisConnectionFailureException.class, DataAccessException.class})
+    public ResponseEntity<ErrorResponse> handleRedisUnavailable(Exception ex) {
+        log.error("Redis datastore service unavailable: {}", ex.getMessage(), ex);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ErrorResponse.of("Database service is temporarily unavailable. Please try again later."));
     }
 
     /**

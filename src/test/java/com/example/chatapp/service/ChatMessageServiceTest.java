@@ -2,7 +2,9 @@ package com.example.chatapp.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -68,6 +70,24 @@ class ChatMessageServiceTest {
         ChatMessage expectedMessage = new ChatMessage("guest_user", "Hello, everyone!", "2024-01-01T10:00:00Z");
         verify(messageRepository).saveMessage(eq("general"), eq(expectedMessage));
         verify(messagePublisher).publish(eq("general"), eq(expectedMessage));
+    }
+
+    @Test
+    @DisplayName("sendMessage when publishing fails still returns success because message was persisted")
+    void sendMessage_whenPublishingFails_stillSucceedsBecauseMessageIsSaved() {
+        when(chatRoomRepository.existsById("general")).thenReturn(true);
+        when(chatRoomRepository.isParticipant("general", "guest_user")).thenReturn(true);
+        doThrow(new RuntimeException("Pub/Sub socket glitch"))
+                .when(messagePublisher).publish(eq("general"), any());
+
+        SendMessageRequest request = new SendMessageRequest("guest_user", "Hello, everyone!");
+        SendMessageResponse response = chatMessageService.sendMessage("general", request);
+
+        assertThat(response.status()).isEqualTo("success");
+        assertThat(response.message()).isEqualTo("Message sent successfully.");
+
+        ChatMessage expectedMessage = new ChatMessage("guest_user", "Hello, everyone!", "2024-01-01T10:00:00Z");
+        verify(messageRepository).saveMessage(eq("general"), eq(expectedMessage));
     }
 
     @Test
