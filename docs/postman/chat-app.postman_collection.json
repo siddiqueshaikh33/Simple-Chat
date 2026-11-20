@@ -1,0 +1,500 @@
+{
+	"info": {
+		"_postman_id": "8f8b3c90-a12b-4d43-98fe-7521a00a1234",
+		"name": "Redis Chat Application API",
+		"description": "Comprehensive Postman test collection for the Spring Boot 3 Redis Chat Application backend. Covers all 5 assignment requirements, edge cases, and error responses.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080/api/chatapp",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "1. Create Chat Room",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 201 Created\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"pm.test(\"Response has success status and roomId\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.status).to.eql(\"success\");",
+							"    pm.expect(jsonData.roomId).to.eql(\"general\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"roomName\": \"general\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/chatrooms",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"chatrooms"
+					]
+				},
+				"description": "Creates a new chat room with unique roomName 'general'."
+			},
+			"response": []
+		},
+		{
+			"name": "2. Join Chat Room",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Response confirms user joined\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.status).to.eql(\"success\");",
+							"    pm.expect(jsonData.message).to.include(\"guest_user\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"participant\": \"guest_user\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/chatrooms/general/join",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"chatrooms",
+						"general",
+						"join"
+					]
+				},
+				"description": "Adds participant 'guest_user' to the room's participant Set."
+			},
+			"response": []
+		},
+		{
+			"name": "3. Send Message 1",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Message sent successfully\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.status).to.eql(\"success\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"participant\": \"guest_user\",\n  \"message\": \"Hello, everyone!\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/chatrooms/general/messages",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"chatrooms",
+						"general",
+						"messages"
+					]
+				},
+				"description": "Appends message to Redis List and broadcasts live via Redis Pub/Sub."
+			},
+			"response": []
+		},
+		{
+			"name": "4. Send Message 2",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Message sent successfully\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.status).to.eql(\"success\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"participant\": \"guest_user\",\n  \"message\": \"How is everyone doing?\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/chatrooms/general/messages",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"chatrooms",
+						"general",
+						"messages"
+					]
+				},
+				"description": "Sends second message to general room."
+			},
+			"response": []
+		},
+		{
+			"name": "5. Retrieve Chat History (limit = 10)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Messages returned in chronological order\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.messages).to.be.an(\"array\");",
+							"    pm.expect(jsonData.messages.length).to.be.at.least(2);",
+							"    pm.expect(jsonData.messages[0].message).to.eql(\"Hello, everyone!\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/chatrooms/general/messages?limit=10",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"chatrooms",
+						"general",
+						"messages"
+					],
+					"query": [
+						{
+							"key": "limit",
+							"value": "10"
+						}
+					]
+				},
+				"description": "Retrieves last 10 messages from general room."
+			},
+			"response": []
+		},
+		{
+			"name": "6. Retrieve Chat History (Last Message limit = 1)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Returns exactly 1 most recent message\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.messages).to.be.an(\"array\");",
+							"    pm.expect(jsonData.messages.length).to.eql(1);",
+							"    pm.expect(jsonData.messages[0].message).to.eql(\"How is everyone doing?\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/chatrooms/general/messages?limit=1",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"chatrooms",
+						"general",
+						"messages"
+					],
+					"query": [
+						{
+							"key": "limit",
+							"value": "1"
+						}
+					]
+				},
+				"description": "Satisfies Test Case 2: retrieve only the last message."
+			},
+			"response": []
+		},
+		{
+			"name": "7. Error: Duplicate Room Name (Expect 409)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 409 Conflict\", function () {",
+							"    pm.response.to.have.status(409);",
+							"});",
+							"pm.test(\"Error response conforms to standard schema\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.status).to.eql(\"error\");",
+							"    pm.expect(jsonData.message).to.include(\"already exists\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"roomName\": \"general\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/chatrooms",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"chatrooms"
+					]
+				},
+				"description": "Attempts to create 'general' again, expecting 409 Conflict."
+			},
+			"response": []
+		},
+		{
+			"name": "8. Error: Send Message to Missing Room (Expect 404)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 404 Not Found\", function () {",
+							"    pm.response.to.have.status(404);",
+							"});",
+							"pm.test(\"Error response indicates room not found\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.status).to.eql(\"error\");",
+							"    pm.expect(jsonData.message).to.include(\"not found\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"participant\": \"guest_user\",\n  \"message\": \"Hello to void\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/chatrooms/non_existent_room/messages",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"chatrooms",
+						"non_existent_room",
+						"messages"
+					]
+				},
+				"description": "Satisfies Test Case 4: send message to non-existent room."
+			},
+			"response": []
+		},
+		{
+			"name": "9. Error: Unauthorized Sender (Expect 403)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 403 Forbidden\", function () {",
+							"    pm.response.to.have.status(403);",
+							"});",
+							"pm.test(\"Error response indicates user is not a participant\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.status).to.eql(\"error\");",
+							"    pm.expect(jsonData.message).to.include(\"not a participant\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"participant\": \"unjoined_user\",\n  \"message\": \"Uninvited hello\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/chatrooms/general/messages",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"chatrooms",
+						"general",
+						"messages"
+					]
+				},
+				"description": "Verifies that an unjoined sender is rejected with 403 Forbidden."
+			},
+			"response": []
+		},
+		{
+			"name": "10. Delete Chat Room (Test Case 5)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Response confirms room deletion\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.status).to.eql(\"success\");",
+							"    pm.expect(jsonData.message).to.include(\"deleted successfully\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/chatrooms/general",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"chatrooms",
+						"general"
+					]
+				},
+				"description": "Satisfies Test Case 5: deletes chat room and all Redis keys."
+			},
+			"response": []
+		},
+		{
+			"name": "11. Error: Verify Room is Gone (Expect 404)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 404 Not Found\", function () {",
+							"    pm.response.to.have.status(404);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/chatrooms/general/messages",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"chatrooms",
+						"general",
+						"messages"
+					]
+				},
+				"description": "Confirms room was deleted and cannot be queried."
+			},
+			"response": []
+		}
+	]
+}
