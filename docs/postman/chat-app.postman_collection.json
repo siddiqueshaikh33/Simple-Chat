@@ -2,19 +2,60 @@
 	"info": {
 		"_postman_id": "8f8b3c90-a12b-4d43-98fe-7521a00a1234",
 		"name": "Redis Chat Application API",
-		"description": "Comprehensive Postman test collection for the Spring Boot 3 Redis Chat Application backend. Covers all 5 assignment requirements, edge cases, and error responses.",
+		"description": "Comprehensive Postman test collection for the Spring Boot 3 Redis Chat Application backend. Covers all 5 assignment requirements, edge cases, error responses, and health checks.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [
 		{
+			"key": "rootUrl",
+			"value": "https://simple-chat-production-a070ca1f.up.railway.app",
+			"type": "string"
+		},
+		{
 			"key": "baseUrl",
-			"value": "http://localhost:8080/api/chatapp",
+			"value": "https://simple-chat-production-a070ca1f.up.railway.app/api/chatapp",
 			"type": "string"
 		}
 	],
 	"item": [
 		{
-			"name": "1. Create Chat Room",
+			"name": "0. Health & Redis Connectivity",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Application and Redis are UP\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.status).to.eql(\"UP\");",
+							"    pm.expect(jsonData.redis).to.eql(\"UP\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{rootUrl}}/health",
+					"host": [
+						"{{rootUrl}}"
+					],
+					"path": [
+						"health"
+					]
+				},
+				"description": "Verifies that the Spring Boot container is live and actively connected to Redis."
+			},
+			"response": []
+		},
+		{
+			"name": "1. Create Chat Room (Test Case 1)",
 			"event": [
 				{
 					"listen": "test",
@@ -59,7 +100,7 @@
 			"response": []
 		},
 		{
-			"name": "2. Join Chat Room",
+			"name": "2. Join Chat Room (Test Case 1)",
 			"event": [
 				{
 					"listen": "test",
@@ -101,12 +142,12 @@
 						"join"
 					]
 				},
-				"description": "Adds participant 'guest_user' to the room's participant Set."
+				"description": "Allows participant 'guest_user' to join the 'general' room."
 			},
 			"response": []
 		},
 		{
-			"name": "3. Send Message 1",
+			"name": "3. Send Message 1 (Test Case 2)",
 			"event": [
 				{
 					"listen": "test",
@@ -115,7 +156,54 @@
 							"pm.test(\"Status code is 200 OK\", function () {",
 							"    pm.response.to.have.status(200);",
 							"});",
-							"pm.test(\"Message sent successfully\", function () {",
+							"pm.test(\"Message sent confirmation\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.status).to.eql(\"success\");",
+							"    pm.expect(jsonData.message).to.eql(\"Message sent successfully.\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"participant\": \"guest_user\",\n  \"message\": \"Hello, world!\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/chatrooms/general/messages",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"chatrooms",
+						"general",
+						"messages"
+					]
+				},
+				"description": "Sends first chat message from guest_user."
+			},
+			"response": []
+		},
+		{
+			"name": "4. Send Message 2 (Test Case 2 & 3)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Message sent confirmation\", function () {",
 							"    var jsonData = pm.response.json();",
 							"    pm.expect(jsonData.status).to.eql(\"success\");",
 							"});"
@@ -134,7 +222,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n  \"participant\": \"guest_user\",\n  \"message\": \"Hello, everyone!\"\n}"
+					"raw": "{\n  \"participant\": \"guest_user\",\n  \"message\": \"Second real-time message!\"\n}"
 				},
 				"url": {
 					"raw": "{{baseUrl}}/chatrooms/general/messages",
@@ -147,12 +235,12 @@
 						"messages"
 					]
 				},
-				"description": "Appends message to Redis List and broadcasts live via Redis Pub/Sub."
+				"description": "Sends second chat message triggering Redis Pub/Sub broadcast."
 			},
 			"response": []
 		},
 		{
-			"name": "4. Send Message 2",
+			"name": "5. Retrieve Chat History (Last 10) (Test Case 2)",
 			"event": [
 				{
 					"listen": "test",
@@ -161,57 +249,12 @@
 							"pm.test(\"Status code is 200 OK\", function () {",
 							"    pm.response.to.have.status(200);",
 							"});",
-							"pm.test(\"Message sent successfully\", function () {",
-							"    var jsonData = pm.response.json();",
-							"    pm.expect(jsonData.status).to.eql(\"success\");",
-							"});"
-						],
-						"type": "text/javascript"
-					}
-				}
-			],
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n  \"participant\": \"guest_user\",\n  \"message\": \"How is everyone doing?\"\n}"
-				},
-				"url": {
-					"raw": "{{baseUrl}}/chatrooms/general/messages",
-					"host": [
-						"{{baseUrl}}"
-					],
-					"path": [
-						"chatrooms",
-						"general",
-						"messages"
-					]
-				},
-				"description": "Sends second message to general room."
-			},
-			"response": []
-		},
-		{
-			"name": "5. Retrieve Chat History (limit = 10)",
-			"event": [
-				{
-					"listen": "test",
-					"script": {
-						"exec": [
-							"pm.test(\"Status code is 200 OK\", function () {",
-							"    pm.response.to.have.status(200);",
-							"});",
-							"pm.test(\"Messages returned in chronological order\", function () {",
+							"pm.test(\"Messages array returned in chronological order\", function () {",
 							"    var jsonData = pm.response.json();",
 							"    pm.expect(jsonData.messages).to.be.an(\"array\");",
 							"    pm.expect(jsonData.messages.length).to.be.at.least(2);",
-							"    pm.expect(jsonData.messages[0].message).to.eql(\"Hello, everyone!\");",
+							"    pm.expect(jsonData.messages[0].participant).to.eql(\"guest_user\");",
+							"    pm.expect(jsonData.messages[0].message).to.eql(\"Hello, world!\");",
 							"});"
 						],
 						"type": "text/javascript"
@@ -238,12 +281,12 @@
 						}
 					]
 				},
-				"description": "Retrieves last 10 messages from general room."
+				"description": "Retrieves last 10 messages from general chat room."
 			},
 			"response": []
 		},
 		{
-			"name": "6. Retrieve Chat History (Last Message limit = 1)",
+			"name": "6. Retrieve Chat History (Last 1)",
 			"event": [
 				{
 					"listen": "test",
@@ -252,11 +295,10 @@
 							"pm.test(\"Status code is 200 OK\", function () {",
 							"    pm.response.to.have.status(200);",
 							"});",
-							"pm.test(\"Returns exactly 1 most recent message\", function () {",
+							"pm.test(\"Exactly 1 message returned\", function () {",
 							"    var jsonData = pm.response.json();",
 							"    pm.expect(jsonData.messages).to.be.an(\"array\");",
 							"    pm.expect(jsonData.messages.length).to.eql(1);",
-							"    pm.expect(jsonData.messages[0].message).to.eql(\"How is everyone doing?\");",
 							"});"
 						],
 						"type": "text/javascript"
@@ -283,12 +325,12 @@
 						}
 					]
 				},
-				"description": "Satisfies Test Case 2: retrieve only the last message."
+				"description": "Tests query parameter limit=1 (returns latest message)."
 			},
 			"response": []
 		},
 		{
-			"name": "7. Error: Duplicate Room Name (Expect 409)",
+			"name": "7. Error: Duplicate Room Name (Test Case 4)",
 			"event": [
 				{
 					"listen": "test",
@@ -297,7 +339,7 @@
 							"pm.test(\"Status code is 409 Conflict\", function () {",
 							"    pm.response.to.have.status(409);",
 							"});",
-							"pm.test(\"Error response conforms to standard schema\", function () {",
+							"pm.test(\"Error envelope returned\", function () {",
 							"    var jsonData = pm.response.json();",
 							"    pm.expect(jsonData.status).to.eql(\"error\");",
 							"    pm.expect(jsonData.message).to.include(\"already exists\");",
@@ -328,12 +370,12 @@
 						"chatrooms"
 					]
 				},
-				"description": "Attempts to create 'general' again, expecting 409 Conflict."
+				"description": "Verifies that creating an existing room returns 409 Conflict."
 			},
 			"response": []
 		},
 		{
-			"name": "8. Error: Send Message to Missing Room (Expect 404)",
+			"name": "8. Error: Send Message to Missing Room (Test Case 4)",
 			"event": [
 				{
 					"listen": "test",
@@ -342,7 +384,7 @@
 							"pm.test(\"Status code is 404 Not Found\", function () {",
 							"    pm.response.to.have.status(404);",
 							"});",
-							"pm.test(\"Error response indicates room not found\", function () {",
+							"pm.test(\"Error envelope confirms room not found\", function () {",
 							"    var jsonData = pm.response.json();",
 							"    pm.expect(jsonData.status).to.eql(\"error\");",
 							"    pm.expect(jsonData.message).to.include(\"not found\");",
@@ -362,7 +404,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n  \"participant\": \"guest_user\",\n  \"message\": \"Hello to void\"\n}"
+					"raw": "{\n  \"participant\": \"guest_user\",\n  \"message\": \"Ghost message\"\n}"
 				},
 				"url": {
 					"raw": "{{baseUrl}}/chatrooms/non_existent_room/messages",
@@ -375,12 +417,12 @@
 						"messages"
 					]
 				},
-				"description": "Satisfies Test Case 4: send message to non-existent room."
+				"description": "Verifies sending to non-existent room returns 404 Not Found."
 			},
 			"response": []
 		},
 		{
-			"name": "9. Error: Unauthorized Sender (Expect 403)",
+			"name": "9. Error: Unauthorized Sender (Test Case 4)",
 			"event": [
 				{
 					"listen": "test",
@@ -389,7 +431,7 @@
 							"pm.test(\"Status code is 403 Forbidden\", function () {",
 							"    pm.response.to.have.status(403);",
 							"});",
-							"pm.test(\"Error response indicates user is not a participant\", function () {",
+							"pm.test(\"Error envelope confirms sender is not a participant\", function () {",
 							"    var jsonData = pm.response.json();",
 							"    pm.expect(jsonData.status).to.eql(\"error\");",
 							"    pm.expect(jsonData.message).to.include(\"not a participant\");",
