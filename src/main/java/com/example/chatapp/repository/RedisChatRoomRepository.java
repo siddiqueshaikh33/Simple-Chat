@@ -42,6 +42,17 @@ public class RedisChatRoomRepository implements ChatRoomRepository {
     private static final RedisScript<Long> CREATE_ROOM_SCRIPT =
             new DefaultRedisScript<>(CREATE_ROOM_LUA, Long.class);
 
+    private static final String DELETE_ROOM_LUA =
+            "local removed = redis.call('SREM', KEYS[1], ARGV[1])\n" +
+            "if removed == 0 then\n" +
+            "    return 0\n" +
+            "end\n" +
+            "redis.call('DEL', KEYS[2], KEYS[3], KEYS[4])\n" +
+            "return 1\n";
+
+    private static final RedisScript<Long> DELETE_ROOM_SCRIPT =
+            new DefaultRedisScript<>(DELETE_ROOM_LUA, Long.class);
+
     private final StringRedisTemplate redisTemplate;
 
     /**
@@ -136,25 +147,31 @@ public class RedisChatRoomRepository implements ChatRoomRepository {
     }
 
     /**
-     * Deletes all room-related keys from Redis and removes room from master registry.
+     * Atomically deletes a chat room by removing it from the master registry Set
+     * and deleting its metadata Hash, participants Set, and messages List in a single Lua script.
+     * Returns true if the room existed and was deleted, false if it did not exist.
      */
     @Override
     public boolean deleteRoom(String roomId) {
-        if (!existsById(roomId)) {
-            return false;
-        }
-
-        // Remove from master registry Set
-        redisTemplate.opsForSet().remove(RedisKeys.ROOM_NAMES_SET, roomId);
-
-        // Delete metadata Hash, participants Set, and messages List
-        List<String> keysToDelete = List.of(
+        List<String> keys = List.of(
+                RedisKeys.ROOM_NAMES_SET,
                 RedisKeys.roomMetadataKey(roomId),
                 RedisKeys.participantsKey(roomId),
                 RedisKeys.messagesKey(roomId)
         );
-        redisTemplate.delete(keysToDelete);
-        log.info("Deleted all Redis keys for chat room '{}'", roomId);
-        return true;
+
+        Long result = redisTemplate.execute(
+                DELETE_ROOM_SCRIPT,
+                keys,
+                roomId
+        );
+
+        boolean deleted = result != null && result > 0L;
+        if (deleted) {
+            log.info("Deleted all Redis keys for chat room '{}' atomically via Lua script", roomId);
+        } else {
+            log.warn("Attempted to delete non-existent or already deleted chat room: {}", roomId);
+        }
+        return deleted;
     }
 }

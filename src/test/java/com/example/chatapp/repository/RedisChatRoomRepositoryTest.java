@@ -138,27 +138,31 @@ class RedisChatRoomRepositoryTest {
     }
 
     @Test
-    @DisplayName("deleteRoom: removes room and deletes keys when exists")
+    @DisplayName("deleteRoom: removes room and deletes keys atomically when room exists")
     void testDeleteRoom_Exists() {
-        when(redisTemplate.opsForSet()).thenReturn(setOperations);
-        when(setOperations.isMember(RedisKeys.ROOM_NAMES_SET, "room-1")).thenReturn(true);
+        when(redisTemplate.execute(any(), anyList(), eq("room-1")))
+                .thenReturn(1L);
 
         boolean deleted = repository.deleteRoom("room-1");
         assertThat(deleted).isTrue();
 
-        verify(setOperations).remove(RedisKeys.ROOM_NAMES_SET, "room-1");
-        verify(redisTemplate).delete(List.of(
-                RedisKeys.roomMetadataKey("room-1"),
-                RedisKeys.participantsKey("room-1"),
-                RedisKeys.messagesKey("room-1")
-        ));
+        verify(redisTemplate).execute(
+                any(),
+                eq(List.of(
+                        RedisKeys.ROOM_NAMES_SET,
+                        RedisKeys.roomMetadataKey("room-1"),
+                        RedisKeys.participantsKey("room-1"),
+                        RedisKeys.messagesKey("room-1")
+                )),
+                eq("room-1")
+        );
     }
 
     @Test
     @DisplayName("deleteRoom: returns false when room does not exist")
     void testDeleteRoom_NotExists() {
-        when(redisTemplate.opsForSet()).thenReturn(setOperations);
-        when(setOperations.isMember(RedisKeys.ROOM_NAMES_SET, "non-existent")).thenReturn(false);
+        when(redisTemplate.execute(any(), anyList(), eq("non-existent")))
+                .thenReturn(0L);
 
         boolean deleted = repository.deleteRoom("non-existent");
         assertThat(deleted).isFalse();
