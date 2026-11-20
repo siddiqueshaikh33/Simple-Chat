@@ -12,6 +12,8 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -29,6 +31,17 @@ public class RedisChatRoomRepository implements ChatRoomRepository {
     private static final String FIELD_ROOM_NAME = "roomName";
     private static final String FIELD_CREATED_AT = "createdAt";
 
+    private static final String CREATE_ROOM_LUA =
+            "local added = redis.call('SADD', KEYS[1], ARGV[1])\n" +
+            "if added == 0 then\n" +
+            "    return 0\n" +
+            "end\n" +
+            "redis.call('HSET', KEYS[2], 'roomId', ARGV[1], 'roomName', ARGV[2], 'createdAt', ARGV[3])\n" +
+            "return 1\n";
+
+    private static final RedisScript<Long> CREATE_ROOM_SCRIPT =
+            new DefaultRedisScript<>(CREATE_ROOM_LUA, Long.class);
+
     private final StringRedisTemplate redisTemplate;
 
     /**
@@ -39,28 +52,29 @@ public class RedisChatRoomRepository implements ChatRoomRepository {
     }
 
     /**
-     * Atomically adds the roomId to the master room names Set.
-     * If SADD returns 0, the room is a duplicate, throwing {@link RoomAlreadyExistsException}.
-     * On success, writes metadata to the room's Hash.
+     * Atomically adds the roomId to the master room names Set and writes room metadata to Hash.
+     * Uses an atomic Redis Lua script so that if duplicate, returns 0 and throws {@link RoomAlreadyExistsException}.
+     * If the server crashes or disconnects during creation, no orphan entries are left behind.
      */
     @Override
     public void saveRoom(String roomId, String roomName, Instant createdAt) {
-        // Atomic SADD check: returns 1 if added, 0 if already existed (avoids check-then-create race condition)
-        Long added = redisTemplate.opsForSet().add(RedisKeys.ROOM_NAMES_SET, roomId);
-        if (added == null || added == 0L) {
+        String metaKey = RedisKeys.roomMetadataKey(roomId);
+        List<String> keys = List.of(RedisKeys.ROOM_NAMES_SET, metaKey);
+
+        Long result = redisTemplate.execute(
+                CREATE_ROOM_SCRIPT,
+                keys,
+                roomId,
+                roomName,
+                createdAt.toString()
+        );
+
+        if (result == null || result == 0L) {
             log.warn("Attempted to create existing chat room: {}", roomId);
             throw new RoomAlreadyExistsException(roomId);
         }
 
-        // Store room metadata in Redis Hash: HSET chatroom:{roomId}
-        String metaKey = RedisKeys.roomMetadataKey(roomId);
-        Map<String, String> metadata = new HashMap<>();
-        metadata.put(FIELD_ROOM_ID, roomId);
-        metadata.put(FIELD_ROOM_NAME, roomName);
-        metadata.put(FIELD_CREATED_AT, createdAt.toString());
-
-        redisTemplate.opsForHash().putAll(metaKey, metadata);
-        log.info("Successfully registered chat room '{}' with metadata in Redis", roomId);
+        log.info("Successfully registered chat room '{}' with metadata in Redis (atomic Lua)", roomId);
     }
 
     /**
