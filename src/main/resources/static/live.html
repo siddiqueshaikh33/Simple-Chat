@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Redis Chat — Real-Time Live Stream</title>
+    <title>Redis Chat — Real-Time Pub/Sub Live Monitor</title>
     <style>
         :root {
             --bg-primary: #0f172a;
@@ -14,6 +14,7 @@
             --accent: #38bdf8;
             --accent-green: #22c55e;
             --accent-red: #ef4444;
+            --accent-amber: #f59e0b;
             --border: #475569;
         }
         * {
@@ -28,7 +29,7 @@
             display: flex;
             flex-direction: column;
             min-height: 100vh;
-            padding: 20px;
+            padding: 24px;
         }
         .container {
             max-width: 850px;
@@ -48,7 +49,7 @@
             align-items: center;
             flex-wrap: wrap;
             gap: 12px;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
         .brand {
             display: flex;
@@ -87,6 +88,27 @@
             50% { opacity: 0.4; transform: scale(1.3); }
             100% { opacity: 1; transform: scale(1); }
         }
+        .demo-notice {
+            background-color: rgba(56, 189, 248, 0.08);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .demo-notice strong {
+            color: var(--accent);
+        }
+        .demo-notice a {
+            color: var(--accent);
+            text-decoration: underline;
+            font-weight: 600;
+        }
         .room-bar {
             background-color: var(--bg-secondary);
             border: 1px solid var(--border);
@@ -95,12 +117,13 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
         .room-bar label {
             font-size: 0.9rem;
             color: var(--text-secondary);
             font-weight: 600;
+            white-space: nowrap;
         }
         .room-bar input {
             background-color: var(--bg-primary);
@@ -115,7 +138,7 @@
             background-color: var(--accent);
             color: #000;
             border: none;
-            padding: 8px 16px;
+            padding: 8px 18px;
             border-radius: 8px;
             font-weight: 600;
             cursor: pointer;
@@ -131,26 +154,34 @@
             border-radius: 12px;
             padding: 20px;
             overflow-y: auto;
-            min-height: 420px;
-            max-height: 600px;
+            min-height: 480px;
+            max-height: 650px;
             display: flex;
             flex-direction: column;
-            gap: 14px;
-            margin-bottom: 16px;
+            gap: 12px;
+            margin-bottom: 14px;
         }
         .empty-state {
             margin: auto;
             text-align: center;
             color: var(--text-secondary);
+            max-width: 480px;
+            line-height: 1.5;
+        }
+        .empty-state p:first-child {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 6px;
         }
         .message-bubble {
             background-color: var(--bg-card);
-            border-radius: 12px;
+            border-radius: 10px;
             padding: 12px 16px;
-            max-width: 85%;
+            max-width: 90%;
             align-self: flex-start;
             border: 1px solid rgba(255, 255, 255, 0.05);
-            animation: fadeIn 0.3s ease-out;
+            animation: fadeIn 0.25s ease-out;
         }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(6px); }
@@ -177,55 +208,15 @@
             color: var(--text-primary);
             word-break: break-word;
         }
-        .send-bar {
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 14px 16px;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .send-bar input.sender-input {
-            width: 140px;
-            background-color: var(--bg-primary);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            padding: 10px 12px;
-            border-radius: 8px;
-            font-size: 0.95rem;
-        }
-        .send-bar input.msg-input {
-            flex: 1;
-            min-width: 220px;
-            background-color: var(--bg-primary);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            padding: 10px 12px;
-            border-radius: 8px;
-            font-size: 0.95rem;
-        }
-        .send-bar button {
-            background-color: var(--accent-green);
-            color: #000;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: opacity 0.2s;
-        }
-        .send-bar button:hover {
-            opacity: 0.9;
-        }
         footer {
-            margin-top: 14px;
             text-align: center;
             color: var(--text-secondary);
             font-size: 0.85rem;
             display: flex;
             justify-content: center;
+            align-items: center;
             gap: 16px;
+            padding: 8px 0;
         }
         footer a {
             color: var(--accent);
@@ -240,7 +231,7 @@
     <div class="container">
         <header>
             <div class="brand">
-                <h1>⚡ Redis Chat <span>Live Stream</span></h1>
+                <h1>⚡ Redis Pub/Sub <span>Live Message Monitor</span></h1>
             </div>
             <div id="statusPill" class="status-pill">
                 <div id="statusDot" class="status-dot"></div>
@@ -248,31 +239,35 @@
             </div>
         </header>
 
+        <!-- Demonstration Notice (Read-Only) -->
+        <div class="demo-notice">
+            <span style="font-size: 1.1rem;">👁️</span>
+            <div>
+                <strong>Demonstration Purpose Only:</strong> This is a <em>read-only live monitor</em> showing real-time messages broadcast across the Redis channel. To send messages or test room creation, use <a href="/swagger-ui/index.html" target="_blank">Swagger UI</a> or <a href="/v3/api-docs" target="_blank">Postman</a>.
+            </div>
+        </div>
+
         <div class="room-bar">
-            <label for="roomInput">Channel / Room:</label>
+            <label for="roomInput">Monitored Channel / Room:</label>
             <input type="text" id="roomInput" value="tech" placeholder="e.g. tech, general">
-            <button onclick="switchRoom()">Connect Room</button>
+            <button onclick="switchRoom()">Monitor Room</button>
         </div>
 
         <div id="chatFeed" class="chat-feed">
             <div id="emptyNotice" class="empty-state">
-                <p>Connecting to live Redis Pub/Sub stream...</p>
-                <p style="font-size: 0.8rem; margin-top: 6px;">Messages published to this room will appear here in real time.</p>
+                <p>Connecting to live Redis stream...</p>
+                <p>When messages are posted via the API, they will appear here in real time as they are broadcast across Redis.</p>
             </div>
         </div>
 
-        <div class="send-bar">
-            <input type="text" id="senderInput" class="sender-input" placeholder="Your name (e.g. Alice)" value="Alice">
-            <input type="text" id="msgInput" class="msg-input" placeholder="Type a message and hit Enter..." onkeypress="handleKey(event)">
-            <button onclick="sendMessage()">Send Live</button>
-        </div>
-
         <footer>
-            <span>Powered by Spring Boot 3 + Redis Pub/Sub</span>
+            <span>Spring Boot 3 + Redis Pub/Sub</span>
             <span>•</span>
-            <a href="/swagger-ui/index.html" target="_blank">Swagger UI</a>
+            <a href="/swagger-ui/index.html" target="_blank">Swagger UI (Send APIs)</a>
             <span>•</span>
             <a href="/health" target="_blank">Health Check</a>
+            <span>•</span>
+            <a href="/v3/api-docs" target="_blank">OpenAPI JSON</a>
         </footer>
     </div>
 
@@ -301,7 +296,7 @@
             }
 
             const chatFeed = document.getElementById("chatFeed");
-            chatFeed.innerHTML = '<div class="empty-state"><p>Listening for real-time messages on <b>chatroom:' + escapeHtml(roomId) + ':channel</b>...</p></div>';
+            chatFeed.innerHTML = '<div class="empty-state"><p>Listening to <b>chatroom:' + escapeHtml(roomId) + ':channel</b>...</p><p>Send messages in Swagger UI to watch them stream here live.</p></div>';
 
             const statusText = document.getElementById("statusText");
             const statusDot = document.getElementById("statusDot");
@@ -311,8 +306,8 @@
             statusDot.style.backgroundColor = "#eab308";
             statusPill.style.color = "#eab308";
 
-            // First load past history
-            fetch('/api/chatapp/chatrooms/' + encodeURIComponent(roomId) + '/messages?limit=20')
+            // Load recent history first
+            fetch('/api/chatapp/chatrooms/' + encodeURIComponent(roomId) + '/messages?limit=25')
                 .then(res => res.ok ? res.json() : null)
                 .then(data => {
                     if (data && data.messages && data.messages.length > 0) {
@@ -322,7 +317,7 @@
                 })
                 .catch(() => {});
 
-            // Connect to live SSE endpoint
+            // Connect to live SSE stream
             const streamUrl = '/api/chatapp/chatrooms/' + encodeURIComponent(roomId) + '/stream';
             eventSource = new EventSource(streamUrl);
 
@@ -370,42 +365,6 @@
 
             chatFeed.appendChild(bubble);
             chatFeed.scrollTop = chatFeed.scrollHeight;
-        }
-
-        async function sendMessage() {
-            const senderInput = document.getElementById("senderInput");
-            const msgInput = document.getElementById("msgInput");
-            const participant = senderInput.value.trim();
-            const message = msgInput.value.trim();
-
-            if (!participant || !message) return;
-
-            // Auto-join if needed
-            await fetch('/api/chatapp/chatrooms/' + encodeURIComponent(currentRoom) + '/join', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ participant: participant })
-            }).catch(() => {});
-
-            // Send message
-            const res = await fetch('/api/chatapp/chatrooms/' + encodeURIComponent(currentRoom) + '/messages', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ participant: participant, message: message })
-            });
-
-            if (res.ok) {
-                msgInput.value = '';
-            } else {
-                const err = await res.json().catch(() => ({}));
-                alert(err.message || "Failed to send message");
-            }
-        }
-
-        function handleKey(e) {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
         }
 
         function escapeHtml(str) {
