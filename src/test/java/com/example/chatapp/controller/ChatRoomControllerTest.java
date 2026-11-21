@@ -50,6 +50,9 @@ class ChatRoomControllerTest {
     @MockBean
     private ChatMessageService chatMessageService;
 
+    @MockBean
+    private com.example.chatapp.service.SseEmitterService sseEmitterService;
+
     @Test
     @DisplayName("POST /api/chatapp/chatrooms with valid name returns 201 Created")
     void createRoom_withValidPayload_returns201Created() throws Exception {
@@ -312,6 +315,27 @@ class ChatRoomControllerTest {
                 .thenThrow(new RoomNotFoundException("missing"));
 
         mockMvc.perform(delete("/api/chatapp/chatrooms/missing"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value("error"))
+                .andExpect(jsonPath("$.message").value("Chat room 'missing' not found."));
+    }
+
+    @Test
+    @DisplayName("GET /api/chatapp/chatrooms/{roomId}/stream returns 200 with text/event-stream when room exists")
+    void streamMessages_whenRoomExists_returns200Ok() throws Exception {
+        when(chatRoomService.roomExists("general")).thenReturn(true);
+        when(sseEmitterService.register("general")).thenReturn(new org.springframework.web.servlet.mvc.method.annotation.SseEmitter());
+
+        mockMvc.perform(get("/api/chatapp/chatrooms/general/stream"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("GET /api/chatapp/chatrooms/{roomId}/stream returns 404 when room does not exist")
+    void streamMessages_whenRoomNotFound_returns404NotFound() throws Exception {
+        when(chatRoomService.roomExists("missing")).thenReturn(false);
+
+        mockMvc.perform(get("/api/chatapp/chatrooms/missing/stream"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value("error"))
                 .andExpect(jsonPath("$.message").value("Chat room 'missing' not found."));

@@ -49,4 +49,13 @@ class RedisKeysTest {
     void allChannelsPattern_returnsExpectedWildcard() {
         assertThat(RedisKeys.CHATROOM_CHANNEL_PATTERN).isEqualTo("chatroom:*:channel");
     }
+
+    @Test
+    @DisplayName("extractRoomIdFromChannel correctly parses roomId")
+    void extractRoomIdFromChannel_returnsRoomId() {
+        assertThat(RedisKeys.extractRoomIdFromChannel("chatroom:tech:channel")).isEqualTo("tech");
+        assertThat(RedisKeys.extractRoomIdFromChannel("chatroom:general:channel")).isEqualTo("general");
+        assertThat(RedisKeys.extractRoomIdFromChannel("invalid:channel")).isNull();
+        assertThat(RedisKeys.extractRoomIdFromChannel(null)).isNull();
+    }
 }

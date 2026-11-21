@@ -75,6 +75,20 @@ public final class RedisKeys {
     }
 
     /**
+     * Extracts the normalized roomId from a Redis Pub/Sub channel string.
+     * e.g. "chatroom:tech:channel" -> "tech"
+     *
+     * @param channel the channel string
+     * @return roomId if valid pattern, or null otherwise
+     */
+    public static String extractRoomIdFromChannel(String channel) {
+        if (channel != null && channel.startsWith(CHATROOM_PREFIX) && channel.endsWith(CHANNEL_SUFFIX)) {
+            return channel.substring(CHATROOM_PREFIX.length(), channel.length() - CHANNEL_SUFFIX.length());
+        }
+        return null;
+    }
+
+    /**
      * Helper to ensure roomId is consistently trimmed and lowercased.
      */
     private static String normalizeRoomId(String roomId) {

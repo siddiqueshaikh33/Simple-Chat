@@ -10,9 +10,11 @@ import com.example.chatapp.dto.JoinRoomResponse;
 import com.example.chatapp.dto.SendMessageRequest;
 import com.example.chatapp.dto.SendMessageResponse;
 import com.example.chatapp.exception.InvalidLimitException;
+import com.example.chatapp.exception.RoomNotFoundException;
 import com.example.chatapp.model.ChatMessage;
 import com.example.chatapp.service.ChatMessageService;
 import com.example.chatapp.service.ChatRoomService;
+import com.example.chatapp.service.SseEmitterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -23,6 +25,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * REST controller exposing endpoints for chat room management and messaging.
@@ -46,10 +50,14 @@ public class ChatRoomController {
 
     private final ChatRoomService chatRoomService;
     private final ChatMessageService chatMessageService;
+    private final SseEmitterService sseEmitterService;
 
-    public ChatRoomController(ChatRoomService chatRoomService, ChatMessageService chatMessageService) {
+    public ChatRoomController(ChatRoomService chatRoomService,
+                              ChatMessageService chatMessageService,
+                              SseEmitterService sseEmitterService) {
         this.chatRoomService = chatRoomService;
         this.chatMessageService = chatMessageService;
+        this.sseEmitterService = sseEmitterService;
     }
 
     /**
@@ -163,5 +171,27 @@ public class ChatRoomController {
         log.info("REST request to delete chat room '{}'", roomId);
         DeleteRoomResponse response = chatRoomService.deleteRoom(roomId);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Subscribes to real-time chat messages for a room via Server-Sent Events (SSE).
+     *
+     * @param roomId the target chat room identifier
+     * @return SseEmitter streaming live messages in real time
+     */
+    @GetMapping(value = "/chatrooms/{roomId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Subscribe to live real-time message stream (SSE)",
+            description = "Opens a persistent Server-Sent Events (SSE) connection that pushes live chat messages as they are broadcast over Redis Pub/Sub.")
+    @ApiResponse(responseCode = "200", description = "Connected to live stream",
+            content = @Content(mediaType = MediaType.TEXT_EVENT_STREAM_VALUE))
+    @ApiResponse(responseCode = "404", description = "Chat room not found",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public SseEmitter streamMessages(@PathVariable String roomId) {
+        log.info("REST request to subscribe to real-time stream for room '{}'", roomId);
+        if (!chatRoomService.roomExists(roomId)) {
+            log.warn("Attempted to stream non-existent room: {}", roomId);
+            throw new RoomNotFoundException(roomId);
+        }
+        return sseEmitterService.register(roomId.trim().toLowerCase());
     }
 }
